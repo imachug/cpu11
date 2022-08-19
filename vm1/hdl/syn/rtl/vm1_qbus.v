@@ -17,23 +17,6 @@
 // The core does not contain any extra metastability eliminators itself
 //
 module vm1_qbus
-#(parameter
-//______________________________________________________________________________
-//
-// If VM1_CORE_REG_USES_RAM is nonzero the Register File is implemented
-// as library RAM module, the constant and vector generators also use
-// this initialized RAM to provide the data. This option is intended to
-// be used on FPGA with embedded RAM blocks
-//
-   VM1_CORE_REG_USES_RAM = 1,
-//______________________________________________________________________________
-//
-// VM1 version select - VM1A or VM1G. VM1G contains another version of
-// microcode, supports VE timer interrupt and MUL operation.
-// If VM1_CORE_MULG_VERSION is defined an nonzero the VM1G core being generated
-//
-   VM1_CORE_MULG_VERSION = 0
-)
 (
    input          pin_clk_p,        // processor clock
    input          pin_clk_n,        // processor clock 180 degree
@@ -952,9 +935,9 @@ end
 //
 // Interrupt controller
 //
-assign pli = VM1_CORE_MULG_VERSION ? pli_g : pli_a;
+assign pli = pli_a;
 
-vm1g_pli  pli_matrix_g(.rq(rq), .sp(pli_g));
+// vm1g_pli  pli_matrix_g(.rq(rq), .sp(pli_g));
 vm1a_pli  pli_matrix_a(.rq(rq), .sp(pli_a));
 
 always @(posedge pin_clk_p)
@@ -1154,9 +1137,9 @@ end
 //
 // Microcode state machine
 //
-assign plx = VM1_CORE_MULG_VERSION ? plx_g : plx_a;
+assign plx = plx_a;
 
-vm1g_plm  plm_matrix_g(.ir(ir), .mr(mj), .sp(plx_g));
+// vm1g_plm  plm_matrix_g(.ir(ir), .mr(mj), .sp(plx_g));
 vm1a_plm  plm_matrix_a(.ir(ir), .mr(mj), .sp(plx_a));
 
 assign plm1x_fc = plm_ena_fc & ~plm[12] &  (plm[11] & plm[13]);
@@ -1360,26 +1343,8 @@ end
 //
 // ALU general purpose registers
 //
-assign xr = VM1_CORE_REG_USES_RAM ? xr_rm : xr_ff;
-assign yr = VM1_CORE_REG_USES_RAM ? yr_rm : yr_ff;
-
-//
-// Implement the Register File with library RAM module
-//
-vm1_reg_ram vreg_rm(
-   .clk_p(pin_clk_p),
-   .clk_n(pin_clk_n),
-   .reset(reset),
-   .plr(plr),
-   .xbus_in(x),
-   .xbus_out(xr_rm),
-   .ybus_out(yr_rm),
-   .wstbl(au_alsl),
-   .wstbh(au_alsh),
-   .ireg(ir),
-   .vsel(vsel),
-   .pa(pin_pa),
-   .carry(psw[0]));
+assign xr = xr_ff;
+assign yr = yr_ff;
 
 //
 // Implement the Register File with Flip-Flops array
@@ -1387,7 +1352,6 @@ vm1_reg_ram vreg_rm(
 // in some implementations
 //
 vm1_reg_ff vreg_ff(
-   .clk_p(pin_clk_p),
    .clk_n(pin_clk_n),
    .reset(reset),
    .plr(plr),
@@ -1469,6 +1433,7 @@ assign x[15:0] = au_alsl ? (au_alsh ? alu[15:0] : {8'o000, alu[7:0]}) :
 assign y[15:0] = ~(yr
                | (au_qsy  ? qreg : 16'o000000)
                | (au_pswy ? psw  : 16'o000000));
+
 //
 // ALU qbus register
 //
@@ -1616,6 +1581,9 @@ endmodule
 //
 // Vector address and constant generator
 //
+//
+// Vector address and constant generator
+//
 module   vm1_vgen
 (
    input  [15:0]  ireg,       // instruction register
@@ -1627,41 +1595,35 @@ module   vm1_vgen
    input  [1:0]   pa,         // processor number
    output [15:0]  value       // output vector value
 );
-reg [15:0]  vmux;             // variable for vector multiplexer
-reg [15:0]  cmux;             // variable for constant multiplexer
+wire[15:0]  vmux;             // variable for vector multiplexer
+wire[15:0]  cmux;             // variable for constant multiplexer
 
 //
 // On schematics vsel is {pli[3], ~pli[2], pli[1], pli[0]}
 //
-always @(*)
-begin
-case(vsel)
-   4'b0000: vmux = 16'o160006;      // double error
-   4'b0001: vmux = 16'o000020;      // IOT instruction
-   4'b0010: vmux = 16'o000010;      // reserved opcode
-   4'b0011: vmux = 16'o000014;      // T-bit/BPT trap
-   4'b0100: vmux = 16'o000004;      // invalid opcode
-   4'b0101:                         // or qbus timeout
-      case (pa[1:0])                // initial start
-         2'b00:  vmux = 16'o177716; // register base
-         2'b01:  vmux = 16'o177736; // depends on
-         2'b10:  vmux = 16'o177756; // processor number
-         2'b11:  vmux = 16'o177776; //
-         default:vmux = 16'o177716; //
-      endcase                       //
-   4'b0110: vmux = 16'o000030;      // EMT instruction
-   4'b0111: vmux = 16'o160012;      // int ack timeout
-   4'b1000: vmux = 16'o000270;      // IRQ3 falling edge
-   4'b1001: vmux = 16'o000024;      // ACLO falling edge
-   4'b1010: vmux = 16'o000100;      // IRQ2 falling edge
-   4'b1011: vmux = 16'o160002;      // IRQ1 low level/HALT
-   4'b1100: vmux = 16'o000034;      // TRAP instruction
-   4'b1101: vmux = ireg;            // instruction register
-   4'b1110: vmux = 16'o000000;      // start @177704
-   4'b1111: vmux = 16'o000000;      // unused vector (iako)
-   default: vmux = 16'o000000;      //
-endcase
-end
+assign vmux =
+   vsel == 4'b0000 ? 16'o160006 :     // double error
+   vsel == 4'b0001 ? 16'o000020 :     // IOT instruction
+   vsel == 4'b0010 ? 16'o000010 :     // reserved opcode
+   vsel == 4'b0011 ? 16'o000014 :     // T-bit/BPT trap
+   vsel == 4'b0100 ? 16'o000004 :     // invalid opcode or qbus timeout
+   vsel == 4'b0101 ? (                // initial start
+      pa[1:0] == 2'b00 ? 16'o177716 : // register base
+      pa[1:0] == 2'b01 ? 16'o177736 : // depends on
+      pa[1:0] == 2'b10 ? 16'o177756 : // processor number
+                         16'o177776   //
+   ):                                 //
+   vsel == 4'b0110 ? 16'o000030 :     // EMT instruction
+   vsel == 4'b0111 ? 16'o160012 :     // int ack timeout
+   vsel == 4'b1000 ? 16'o000270 :     // IRQ3 falling edge
+   vsel == 4'b1001 ? 16'o000024 :     // ACLO falling edge
+   vsel == 4'b1010 ? 16'o000100 :     // IRQ2 falling edge
+   vsel == 4'b1011 ? 16'o160002 :     // IRQ1 low level/HALT
+   vsel == 4'b1100 ? 16'o000034 :     // TRAP instruction
+   vsel == 4'b1101 ? ireg :           // instruction register
+   vsel == 4'b1110 ? 16'o000000 :     // start @177704
+   vsel == 4'b1111 ? 16'o000000 :     // unused vector (iako)
+   16'o000000;                        //
 
 //
 // Constant generator and opcode fields shifter/truncator
@@ -1677,34 +1639,28 @@ end
 //    csel6 = 4b'xx10
 //    csel7 = 4b'xx11
 //
-always @(*)
-begin
-case(csel)
-   4'b0000: cmux = {12'o0000, ireg[3:0]};       // csel0 & csel4 (CLx/SEx)
-   4'b0001: cmux = 16'o000340;                  // csel0 & csel5 (start PSW constant)
-   4'b0010: cmux = 16'o000000;                  // csel0 & csel6 (vector output)
-   4'b0011: cmux = 16'o000002;                  // csel0 & csel7
-   4'b0100: cmux = {9'o000, ireg[5:0], 1'b0};   // csel1 & csel4 (MARK/SOB)
-   4'b0101: cmux = 16'o177716;                  // csel1 & csel5
-   4'b0110: cmux = 16'o177777;                  // csel1 & csel6
-   4'b0111: cmux = 16'o000001;                  // csel1 & csel7
-   4'b1000:                                     //
-      begin                                     // csel2 & csel4
-         if (ireg[7])                           //
-            cmux = {7'o177, ireg[7:0], 1'b0};   // low byte x2   (BR/Bxx)
-         else                                   // sign extension
-            cmux = {7'o000, ireg[7:0], 1'b0};   // for branches
-      end                                       //
-   4'b1001: cmux = 16'o100000;                  // csel2 & csel5
-   4'b1010: cmux = 16'o177676;                  // csel2 & csel6
-   4'b1011: cmux = 16'o000020;                  // csel2 & csel7 (MUL)
-   4'b1100: cmux = {15'o00000, carry};          // csel3 & csel4 (ADC/SBC)
-   4'b1101: cmux = 16'o177400;                  // csel3 & csel5 (start address AND)
-   4'b1110: cmux = 16'o000010;                  // csel3 & csel6
-   4'b1111: cmux = 16'o000000;                  // csel3 & csel7 (vector read/vsel)
-   default: cmux = 16'o000000;
-endcase
-end
+assign cmux =
+   csel == 4'b0000 ? {12'o0000, ireg[3:0]} :     // csel0 & csel4 (CLx/SEx)
+   csel == 4'b0001 ? 16'o000340 :                // csel0 & csel5 (start PSW constant)
+   csel == 4'b0010 ? 16'o000000 :                // csel0 & csel6 (vector output)
+   csel == 4'b0011 ? 16'o000002 :                // csel0 & csel7
+   csel == 4'b0100 ? {9'o000, ireg[5:0], 1'b0} : // csel1 & csel4 (MARK/SOB)
+   csel == 4'b0101 ? 16'o177716 :                // csel1 & csel5
+   csel == 4'b0110 ? 16'o177777 :                // csel1 & csel6
+   csel == 4'b0111 ? 16'o000001 :                // csel1 & csel7
+   csel == 4'b1000 ? (                           // csel2 & csel4
+      ireg[7]                                    //
+         ? {7'o177, ireg[7:0], 1'b0}             // low byte x2   (BR/Bxx) sign extension for branches
+         : {7'o000, ireg[7:0], 1'b0}             // sign extension for branches
+   ) :                                           //
+   csel == 4'b1001 ? 16'o100000 :                // csel2 & csel5
+   csel == 4'b1010 ? 16'o177676 :                // csel2 & csel6
+   csel == 4'b1011 ? 16'o000020 :                // csel2 & csel7 (MUL)
+   csel == 4'b1100 ? {15'o00000, carry} :        // csel3 & csel4 (ADC/SBC)
+   csel == 4'b1101 ? 16'o177400 :                // csel3 & csel5 (start address AND)
+   csel == 4'b1110 ? 16'o000010 :                // csel3 & csel6
+   csel == 4'b1111 ? 16'o000000 :                // csel3 & csel7 (vector read/vsel)
+   16'o000000;                                   //
 
 assign value = (vena ? vmux : 16'o000000)
              | (cena ? cmux : 16'o000000);
@@ -1716,7 +1672,6 @@ endmodule
 //
 module vm1_reg_ff
 (
-   input          clk_p,      //
    input          clk_n,      //
    input          reset,      //
    input  [33:0]  plr,        // control matrix
@@ -1844,6 +1799,31 @@ assign ybus_out = (rs0[0]  ? gpr[0]  : 16'o000000)
 
 always @(posedge clk_n)
 begin
+   if (reset)
+   begin
+      //
+      // For accurate simulation only
+      // Added by Ivanq
+      //
+      gpr[0]   <= 16'o000000;
+      gpr[1]   <= 16'o000000;
+      gpr[2]   <= 16'o000000;
+      gpr[3]   <= 16'o000000;
+      gpr[4]   <= 16'o000000;
+      gpr[5]   <= 16'o000000;
+      gpr[6]   <= 16'o000000;
+      gpr[7]   <= 16'o000000;
+      gpr[8]   <= 16'o000000;
+      gpr[9]   <= 16'o000000;
+      gpr[10]  <= 16'o000000;
+      gpr[11]  <= 16'o000000;
+      gpr[12]  <= 16'o000000;
+      gpr[13]  <= 16'o000000;
+   end
+end
+
+always @(posedge clk_n)
+begin
    if (wstbl)
    begin
       if (rsw[0])  gpr[0][7:0]  <= xbus_in[7:0];
@@ -1902,70 +1882,5 @@ end
 // synopsys translate_on
 endmodule
 
-//______________________________________________________________________________
-//
-// Register file, RAM implementation
-//
-module vm1_reg_ram
-(
-   input          clk_p,      //
-   input          clk_n,      //
-   input          reset,      //
-   input  [33:0]  plr,        // control matrix
-   input  [15:0]  xbus_in,    // X bus input
-   output [15:0]  xbus_out,   // X bus output
-   output [15:0]  ybus_out,   // Y bus output
-   input          wstbl,      // write strobe low byte
-   input          wstbh,      // write strobe high byte
-                              //
-   input  [15:0]  ireg,       // instruction register
-   input  [3:0]   vsel,       // interrupt vector selector
-   input  [1:0]   pa,         // processor number
-   input          carry       // carry flag
-);
-wire  vc_vsel, vc_csel;
-reg   [3:0]    vc_reg;
-wire  [15:0]   vc_mux;
-wire  [5:0]    xadr;
-wire  [5:0]    yadr;
-wire           wren;
-
-always @(posedge clk_n)
-begin
-   vc_reg <= vsel;
-end
-
-assign vc_vsel = (plr[28:25] == 4'b0010) & ((plr[13] & ~plr[14]) | plr[11]);
-assign vc_csel = (plr[28:25] != 4'b0010) & ((plr[13] & ~plr[14]) | plr[11]);
-
-assign   wren      = (wstbl & (plr[32:30] != 3'b000) & plr[20]) | (wstbl & ~plr[20]);
-assign   xadr[5:0] = {2'b00, wstbl ? (plr[20] ? plr[33:30] : 4'b1100) : plr[33:30]};
-assign   yadr[3:0] =  vc_vsel ? vsel :
-                     (vc_csel ? plr[28:25] :
-                     ((plr[13] & plr[14]) ? 4'b1100 : ((~plr[11] & ~plr[13]) ? plr[28:25] : 4'b0000)));
-assign   yadr[4]   = vc_vsel;
-assign   yadr[5]   = vc_csel;
-
-vm1_vcram vm1_vcram_reg(
-   .clock(clk_n),
-   .address_a(xadr),
-   .data_a(xbus_in),
-   .q_a(xbus_out),
-   .byteena_a({wstbh | ~wstbl, 1'b1}),
-   .wren_a(wren),
-   .address_b(yadr),
-   .data_b(16'o000000),
-   .wren_b(1'b0),
-   .q_b(vc_mux));
-
-assign ybus_out = vc_mux
-                | ((vc_vsel & (vc_reg == 4'b0101))     ? {10'o0000, pa, 4'o00}     : 16'o000000)
-                | ((vc_vsel & (vc_reg == 4'b1101))     ? ireg                      : 16'o000000)
-                | ((vc_csel & (plr[28:25] == 4'b0000)) ? {12'o0000, ireg[3:0]}     : 16'o000000)
-                | ((vc_csel & (plr[28:25] == 4'b0100)) ? {9'o000, ireg[5:0], 1'b0} : 16'o000000)
-                | ((vc_csel & (plr[28:25] == 4'b1000)) ?
-                                      {ireg[7] ? 7'o177 : 7'o000, ireg[7:0], 1'b0} : 16'o000000)
-                | ((vc_csel & (plr[28:25] == 4'b1100)) ? {15'o00000, carry}        : 16'o000000);
-endmodule
 //______________________________________________________________________________
 //

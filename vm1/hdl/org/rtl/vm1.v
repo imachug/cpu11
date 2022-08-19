@@ -25,7 +25,10 @@ module vm1
    output         pin_iako_n,    // interrupt vector input
    input          pin_sp_n,      // peripheral timer input
    output [2:1]   pin_sel_n,     // register select outputs
-   output         pin_bsy_n      // bus busy flag
+   output         pin_bsy_n,     // bus busy flag
+
+   output [15:0]  pin_ad_out,
+   output         pin_rply_out
 );
 
 //______________________________________________________________________________
@@ -33,12 +36,11 @@ module vm1
 // External pin wires and controls
 //
 wire  pin_ad_ena;
-wire  [15:0] pin_ad_out;
 wire  [2:1] pin_sel_out;
 wire  pin_sync_out, pin_sync_ena;
 wire  pin_dmgo_out, pin_iako_out, pin_din_out, pin_dout_out;
 wire  pin_wtbt_out, pin_ctrl_ena, pin_init_out, pin_sack_out;
-wire  pin_rply_out, pin_dmr_out, pin_bsy_out;
+wire  pin_dmr_out, pin_bsy_out;
 //
 // Shared Qbus lines
 //
