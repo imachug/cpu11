@@ -1689,16 +1689,21 @@ module vm1_reg_ff
 wire  vc_vsel, vc_csel;
 reg   [3:0]    vc_vreg;
 wire  [15:0]   vc_vcd;        // vector/constant data
-wire  [13:0]   rs0, rs1, rsw; // register select
-reg   [15:0]   gpr[0:13];     // register array
+reg   [15:0]   gpr[0:15];     // register array
 
 reg   [3:0]    xadr;
 reg   [3:0]    yadr;
 
 always @(posedge clk_n)
 begin
-   xadr <= plr[33:30];
-   yadr <= plr[28:25];
+   xadr[0] <= plr[33];
+   xadr[1] <= plr[32];
+   xadr[2] <= plr[31];
+   xadr[3] <= plr[30];
+   yadr[0] <= plr[28];
+   yadr[1] <= plr[27];
+   yadr[2] <= plr[26];
+   yadr[3] <= plr[25];
 end
 
 always @(posedge clk_n)
@@ -1719,81 +1724,9 @@ vm1_vgen vgen(
    .value(vc_vcd)       // output vector value
 );
 
-assign rs0[0]  = (yadr == 4'b1111) & ~plr[11] & ~plr[13];
-assign rs0[1]  = (yadr == 4'b0111) & ~plr[11] & ~plr[13];
-assign rs0[2]  = (yadr == 4'b1011) & ~plr[11] & ~plr[13];
-assign rs0[3]  = (yadr == 4'b0011) & ~plr[11] & ~plr[13];
-assign rs0[4]  = (yadr == 4'b1101) & ~plr[11] & ~plr[13];
-assign rs0[5]  = (yadr == 4'b0101) & ~plr[11] & ~plr[13];
-assign rs0[6]  = (yadr == 4'b1001) & ~plr[11] & ~plr[13];
-assign rs0[7]  = (yadr == 4'b0001) & ~plr[11] & ~plr[13];
-assign rs0[8]  = (yadr == 4'b1110) & ~plr[11] & ~plr[13];
-assign rs0[9]  = (yadr == 4'b0110) & ~plr[11] & ~plr[13];
-assign rs0[10] = (yadr == 4'b1010) & ~plr[11] & ~plr[13];
-assign rs0[11] = (yadr == 4'b0010) & ~plr[11] & ~plr[13];
-assign rs0[12] = (yadr == 4'b1100) & ~plr[11] & ~plr[13] | (plr[13] & plr[14]);
-assign rs0[13] = (yadr == 4'b0100) & ~plr[11] & ~plr[13];
+assign xbus_out = gpr[~xadr];
 
-assign rs1[0]  = (xadr == 4'b1111);
-assign rs1[1]  = (xadr == 4'b0111);
-assign rs1[2]  = (xadr == 4'b1011);
-assign rs1[3]  = (xadr == 4'b0011);
-assign rs1[4]  = (xadr == 4'b1101);
-assign rs1[5]  = (xadr == 4'b0101);
-assign rs1[6]  = (xadr == 4'b1001);
-assign rs1[7]  = (xadr == 4'b0001);
-assign rs1[8]  = (xadr == 4'b1110);
-assign rs1[9]  = (xadr == 4'b0110);
-assign rs1[10] = (xadr == 4'b1010);
-assign rs1[11] = (xadr == 4'b0010);
-assign rs1[12] = (xadr == 4'b1100);
-assign rs1[13] = (xadr == 4'b0100);
-
-assign rsw[0]  = (xadr == 4'b1111) & plr[20];
-assign rsw[1]  = (xadr == 4'b0111) & plr[20];
-assign rsw[2]  = (xadr == 4'b1011) & plr[20];
-assign rsw[3]  = (xadr == 4'b0011) & plr[20];
-assign rsw[4]  = (xadr == 4'b1101) & plr[20];
-assign rsw[5]  = (xadr == 4'b0101) & plr[20];
-assign rsw[6]  = (xadr == 4'b1001) & plr[20];
-assign rsw[7]  = (xadr == 4'b0001) & plr[20];
-assign rsw[8]  = (xadr == 4'b1110) & plr[20];
-assign rsw[9]  = (xadr == 4'b0110) & plr[20];
-assign rsw[10] = (xadr == 4'b1010) & plr[20];
-assign rsw[11] = (xadr == 4'b0010) & plr[20];
-assign rsw[12] = (xadr == 4'b1100) | ~plr[20];
-assign rsw[13] = (xadr == 4'b0100) & plr[20];
-
-assign xbus_out = (rs1[0]  ? gpr[0]  : 16'o000000)
-               |  (rs1[1]  ? gpr[1]  : 16'o000000)
-               |  (rs1[2]  ? gpr[2]  : 16'o000000)
-               |  (rs1[3]  ? gpr[3]  : 16'o000000)
-               |  (rs1[4]  ? gpr[4]  : 16'o000000)
-               |  (rs1[5]  ? gpr[5]  : 16'o000000)
-               |  (rs1[6]  ? gpr[6]  : 16'o000000)
-               |  (rs1[7]  ? gpr[7]  : 16'o000000)
-               |  (rs1[8]  ? gpr[8]  : 16'o000000)
-               |  (rs1[9]  ? gpr[9]  : 16'o000000)
-               |  (rs1[10] ? gpr[10] : 16'o000000)
-               |  (rs1[11] ? gpr[11] : 16'o000000)
-               |  (rs1[12] ? gpr[12] : 16'o000000)
-               |  (rs1[13] ? gpr[13] : 16'o000000);
-
-
-assign ybus_out = (rs0[0]  ? gpr[0]  : 16'o000000)
-               |  (rs0[1]  ? gpr[1]  : 16'o000000)
-               |  (rs0[2]  ? gpr[2]  : 16'o000000)
-               |  (rs0[3]  ? gpr[3]  : 16'o000000)
-               |  (rs0[4]  ? gpr[4]  : 16'o000000)
-               |  (rs0[5]  ? gpr[5]  : 16'o000000)
-               |  (rs0[6]  ? gpr[6]  : 16'o000000)
-               |  (rs0[7]  ? gpr[7]  : 16'o000000)
-               |  (rs0[8]  ? gpr[8]  : 16'o000000)
-               |  (rs0[9]  ? gpr[9]  : 16'o000000)
-               |  (rs0[10] ? gpr[10] : 16'o000000)
-               |  (rs0[11] ? gpr[11] : 16'o000000)
-               |  (rs0[12] ? gpr[12] : 16'o000000)
-               |  (rs0[13] ? gpr[13] : 16'o000000)
+assign ybus_out = gpr[(plr[13] & plr[14]) ? 4'b1100 : ~yadr]
                |  (vc_vsel ? vc_vcd  : 16'o000000)
                |  (vc_csel ? vc_vcd  : 16'o000000);
 
@@ -1819,6 +1752,8 @@ begin
       gpr[11]  <= 16'o000000;
       gpr[12]  <= 16'o000000;
       gpr[13]  <= 16'o000000;
+      gpr[14]  <= 16'o000000;
+      gpr[15]  <= 16'o000000;
    end
 end
 
@@ -1826,60 +1761,13 @@ always @(posedge clk_n)
 begin
    if (wstbl)
    begin
-      if (rsw[0])  gpr[0][7:0]  <= xbus_in[7:0];
-      if (rsw[1])  gpr[1][7:0]  <= xbus_in[7:0];
-      if (rsw[2])  gpr[2][7:0]  <= xbus_in[7:0];
-      if (rsw[3])  gpr[3][7:0]  <= xbus_in[7:0];
-      if (rsw[4])  gpr[4][7:0]  <= xbus_in[7:0];
-      if (rsw[5])  gpr[5][7:0]  <= xbus_in[7:0];
-      if (rsw[6])  gpr[6][7:0]  <= xbus_in[7:0];
-      if (rsw[7])  gpr[7][7:0]  <= xbus_in[7:0];
-      if (rsw[8])  gpr[8][7:0]  <= xbus_in[7:0];
-      if (rsw[9])  gpr[9][7:0]  <= xbus_in[7:0];
-      if (rsw[10]) gpr[10][7:0] <= xbus_in[7:0];
-      if (rsw[11]) gpr[11][7:0] <= xbus_in[7:0];
-      if (rsw[12]) gpr[12][7:0] <= xbus_in[7:0];
-      if (rsw[13]) gpr[13][7:0] <= xbus_in[7:0];
+      gpr[plr[20] ? ~xadr : 4'b1100][7:0] <= xbus_in[7:0];
    end
    if (wstbh)
    begin
-      if (rsw[0])  gpr[0][15:8]  <= xbus_in[15:8];
-      if (rsw[1])  gpr[1][15:8]  <= xbus_in[15:8];
-      if (rsw[2])  gpr[2][15:8]  <= xbus_in[15:8];
-      if (rsw[3])  gpr[3][15:8]  <= xbus_in[15:8];
-      if (rsw[4])  gpr[4][15:8]  <= xbus_in[15:8];
-      if (rsw[5])  gpr[5][15:8]  <= xbus_in[15:8];
-      if (rsw[6])  gpr[6][15:8]  <= xbus_in[15:8];
-      if (rsw[7])  gpr[7][15:8]  <= xbus_in[15:8];
-      if (rsw[8])  gpr[8][15:8]  <= xbus_in[15:8];
-      if (rsw[9])  gpr[9][15:8]  <= xbus_in[15:8];
-      if (rsw[10]) gpr[10][15:8] <= xbus_in[15:8];
-      if (rsw[11]) gpr[11][15:8] <= xbus_in[15:8];
-      if (rsw[12]) gpr[12][15:8] <= xbus_in[15:8];
-      if (rsw[13]) gpr[13][15:8] <= xbus_in[15:8];
+      gpr[plr[20] ? ~xadr : 4'b1100][15:8] <= xbus_in[15:8];
    end
 end
-
-// synopsys translate_off
-initial
-begin
-   gpr[0]   = 16'o000000;
-   gpr[1]   = 16'o000000;
-   gpr[2]   = 16'o000000;
-   gpr[3]   = 16'o000000;
-   gpr[4]   = 16'o000000;
-   gpr[5]   = 16'o000000;
-   gpr[6]   = 16'o000000;
-   gpr[7]   = 16'o000000;
-   gpr[8]   = 16'o000000;
-   gpr[9]   = 16'o000000;
-   gpr[10]  = 16'o000000;
-   gpr[11]  = 16'o000000;
-   gpr[12]  = 16'o000000;
-   gpr[13]  = 16'o000000;
-   gpr[0]   = 16'o000000;
-end
-// synopsys translate_on
 endmodule
 
 //______________________________________________________________________________
